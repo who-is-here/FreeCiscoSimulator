@@ -1,0 +1,11 @@
+# ignore object and archive files
+*.[ao]
+moc_*
+Makefile
+*.autosave
+*.pro.user*
+FreeCiscoSimulator
+.~lock*
+*.dot
+*.so
+*.dll
