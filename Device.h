@@ -10,29 +10,16 @@ class QIcmpTimer: public QObject
 {
     Q_OBJECT
 public:
-    QIcmpTimer(const QString &dst);
+    QIcmpTimer(const quint32& dst);
 private slots:
     void timerShot();
 signals:
-    void send(const QString& dst, const quint8& iType);
+    void send(const quint32& dst, const quint8& iType);
 private:
-    QString mDst;
+    quint32 mDst;
 };
 
-struct packet{
-    enum protocols {icmp, tcp, udp, igmp};
-
-    protocols proto;
-    QHostAddress src;
-    QHostAddress dst;
-    quint16 sport;
-    quint16 dport;
-    QString src_mac;
-    QString dst_mac;
-    QHostAddress nhop;
-    quint8 ttl;
-    QString data;
-};
+#include "packet.h"
 
 class Device : public QObject
 {
@@ -76,14 +63,6 @@ class Device : public QObject
             quint8 metric;
         };
 
-        /*struct commands{
-            DeviceType type;
-            const QString& cmdName;
-            cmdPlugin* plg;
-        };*/
-
-//        explicit Device ();
-//        explicit Device (const QString& );
         explicit Device (const QString& name = "");
 
         QString SetDeviceID(const QString& id);
@@ -115,6 +94,8 @@ class Device : public QObject
         void addRoute (const QString& dev, const QString& addr, const int& prefix=32, QString gw="");
         void delRoute (const QString& dev, const QString& addr, const int& prefix, const QString& gw="");
 
+        bool allow_forward;
+
         QHash<QString, Device::deviceInterface> Interfaces() const
             { return mInterfaces; }
         QList<Device::route> routes() const
@@ -127,9 +108,6 @@ class Device : public QObject
         QString config_if;
         bool isNegated;
         // End of bad idea
-
-
-//        typedef void (* cmdPlugin)(const QString& cmd);
 
 
     protected:
@@ -145,20 +123,20 @@ class Device : public QObject
         QList<Device::route> mRoutes;
         QHash<QString, Device::deviceInterface> mInterfaces;
 
-        void ProcessPacket(packet& pkt);
-        void RoutePacket(packet& pkt);
-        void SendPacket(const packet& pkt, const quint8& port);
+        void ProcessIcmpPacket(packet* pkt);
+        void RoutePacket(packet* pkt_raw);
+        void SendPacket(const ether_frame& frm, const quint8& port);
         QHostAddress keeped_dst;
+        bool isTransit;
 
         QString CommandToBeInterrupted;
 
-//        QHash<QString, cmdPlugin> commands;
     public slots:
         virtual void onExecuteCommand(const QString& cmd) = 0;
-        void PacketRecieved(packet &pkt, const quint8& port);
-        void CreateIcmpPacket(const QString& dst, const quint8& iType);
+        void PacketRecieved(ether_frame& frm, const quint8& port);
+        void CreateIcmpPacket(const quint32& dst, const quint8& iType, const quint32& src=1);
         void onCommandInterrupt(const QString& cmd);
-//        void onNewConnection();
+
     signals:
         void KeepCommandRequest();
         void CommandReturn();
@@ -166,7 +144,7 @@ class Device : public QObject
         void ConsoleWriteHTML(const QString& text);
         void ChangePrompt(const QString& newPrompt);
         void PropertiesChnaged();
-        void doSend(const quint8& num, packet& pkt);
+        void doSend(const quint8& num, ether_frame& frm);
         void DisconnectConsole();
 };
 

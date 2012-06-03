@@ -106,23 +106,20 @@ void Console::onEnter()
     textCursor().setBlockCharFormat(format);
     this->_currentCommand = cmd;
 
-    // If command is connect, then find pointer to wanted object
-/*    if (QRegExp("connect .*|connect", Qt::CaseInsensitive).exactMatch(cmd))
-        cmdConnect(cmd.mid(8));
-    else if (QRegExp("exit .*|exit", Qt::CaseInsensitive).exactMatch(cmd))
-        cmdExit(cmd.mid(5));
-    else if (QRegExp("clear", Qt::CaseInsensitive).exactMatch(cmd))
-        cmdClear();*/
-    if (cmd.startsWith("connect"))
+
+    if (cmd.startsWith("connect") && !isConnected)
+    {
         cmdConnect(cmd.section(" ",1));
-//    else if (cmd.startsWith("exit"))
-//        cmdExit(cmd.section(" ",1));
+    }
     else if (cmd.startsWith("clear"))
+    {
         cmdClear();
+    }
     else
     {
-        if (isConnected)
+        if (isConnected) {
             emit onCommand(cmd);
+        }
         else
         {
             ConsoleWriteRequest(cmd + ": command unknown");
@@ -153,9 +150,6 @@ void Console::ConsoleWriteRequest(const QString& textToWrite)
 void Console::ConsoleWriteRequestHTML(const QString& textToWrite)
 {
     textCursor().insertHtml("<br/>" + textToWrite);
-//    QString buf = textToWrite;
-//    textCursor().insertHtml("<br/>" + buf.replace(QString("\n"), QString("<br/>")));
-//    textCursor().insertHtml("<br/><pre>" + textToWrite + "</pre>");
     scrollDown();
 }
 
@@ -256,12 +250,6 @@ void Console::cmdConnect(const QString& args)
 
 void Console::cmdExit()
 {
-//    QString ret = args;
-//    if (args.isEmpty())
-//        ret = "0";
-//
-//    if (this->isConnected)
-//    {
     disconnect(this, SIGNAL(onCommand(QString)), this->dev, SLOT(onExecuteCommand(QString)));
     disconnect(this->dev, SIGNAL(KeepCommandRequest()), this, SLOT(KeepCommandString()));
     disconnect(this->dev, SIGNAL(CommandReturn()), this, SLOT(CommandFinished()));
@@ -271,18 +259,11 @@ void Console::cmdExit()
     disconnect(this, SIGNAL(CommandInterrupted(QString)), this->dev, SLOT(onCommandInterrupt(QString)));
     disconnect(this->dev, SIGNAL(DisconnectConsole()), this, SLOT(cmdExit()));
     disconnect(this->dev, SIGNAL(destroyed()), this, SLOT(DeviceDeleted()));
+    emit disconnectCommand(this);
     this->isConnected = false;
     ConsoleWriteRequest("connection closed with "+this->dev->GetDeviceID());
     CommandFinished();
     this->dev = NULL;
-//    }
-//    else
-//    {
-//        ConsoleWriteRequest("exiting...");
-//        CommandFinished();
-////        emit Finished("exiting...");
-//        //this->destroy();
-//    }
 }
 
 void Console::DeviceDeleted()

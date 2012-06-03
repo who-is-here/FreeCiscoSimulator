@@ -5,18 +5,6 @@
 #include <QNetworkAddressEntry>
 #include <QTimer>
 
-/*Device::Device ()
-{
-    this->SetName();
-    this->InitializeInterfaces(1);
-}
-
-Device::Device (const QString &name)
-{
-    this->SetName(name);
-    this->InitializeInterfaces(1);
-}*/
-
 Device::Device (const QString &name)
 {
     extern QString lastDeviceID;
@@ -24,6 +12,7 @@ Device::Device (const QString &name)
     links.clear();
     mRoutes.clear();
     this->SetName(name);
+    isTransit = false;
 }
 
 QString Device::SetDeviceID(const QString &id)
@@ -303,106 +292,137 @@ QHostAddress Device::CalculateSubNet(const QString &addr, const int &pref)
     return QHostAddress(broadcast-prefix);
 }
 
-void Device::PacketRecieved(packet &pkt, const quint8& port)
+void Device::PacketRecieved(ether_frame &frm, const quint8 &port)
 {
-    qDebug() << "Recieved by " << DeviceID;
-
-    if (pkt.dst == QHostAddress::LocalHost)
+    foreach (deviceInterface iface, mInterfaces)
     {
-        ProcessPacket(pkt);
-        return;
-    }
-    foreach (QString key, mInterfaces.keys())
-    {
-        if (pkt.dst == mInterfaces[key].address.ip() && port == mInterfaces[key].AssignedPort->number)
+        // If frame for this device
+        if (iface.hwaddr == frm.dst_mac && iface.AssignedPort->number == port || port == 0)
         {
-            qDebug() << "dst is " << pkt.dst.toString() << "; src is " << pkt.src.toString();
-            if (type != dev_PC)
+            // If packet for this device process it else try to route
+            if (frm.pkt->dstip == iface.address.ip().toIPv4Address() ||
+                QHostAddress(frm.pkt->dstip) == QHostAddress::LocalHost)
             {
-                keeped_dst = pkt.dst;
+                if (frm.pkt->type == "ip")
+                {
+                    // processing ip packet
+                }
+                else if (frm.pkt->type == "icmp")
+                {
+                    isTransit = false;
+                    ProcessIcmpPacket(frm.pkt);
+                }
             }
-            ProcessPacket(pkt);
+            else
+            {
+                if (allow_forward)
+                {
+                    isTransit = true;
+                    RoutePacket(frm.pkt);
+                }
+            }
+            break;
+        }
+    }
+}
+
+void Device::ProcessIcmpPacket(packet* pkt)
+{
+    icmp_packet* ipkt = static_cast<icmp_packet*>(pkt);
+    if (ipkt->icmp_type == 0)
+    {
+        if (QString("ping ").append(QHostAddress(ipkt->srcip).toString()) == CommandToBeInterrupted)
+        {
+            CommandToBeInterrupted = "";
             return;
         }
+        emit ConsoleWrite(QString("Packet received from ").append(QHostAddress(ipkt->srcip).toString()));
+        QIcmpTimer* timer = new QIcmpTimer(ipkt->srcip);
+        connect(timer, SIGNAL(send(quint32,quint8)), this, SLOT(CreateIcmpPacket(quint32,quint8)));
     }
-    if (type != dev_PC)
+    else if (ipkt->icmp_type == 8)
     {
-        qDebug() << "Packet for " << pkt.dst.toString() << " via " << pkt.nhop.toString();
-        foreach (deviceInterface iface, mInterfaces)
-        {
-            if (pkt.nhop == iface.address.ip() && port == iface.AssignedPort->number)
-            {
-                pkt.nhop = QHostAddress::Any;
-                RoutePacket(pkt);
-                break;
-            }
-        }
+        CreateIcmpPacket(ipkt->srcip, 0, ipkt->dstip);
     }
 }
 
-void Device::ProcessPacket(packet &pkt)
+void Device::RoutePacket(packet* pkt)
 {
-    if (pkt.proto == packet::icmp)
+    if (QHostAddress(pkt->dstip) == QHostAddress::LocalHost)
     {
-        if (pkt.data == "echo reply")
-        {
-            qDebug() << "Inetr = " << CommandToBeInterrupted;
-            if (QString("ping ").append(pkt.src.toString()) == CommandToBeInterrupted)
-            {
-                CommandToBeInterrupted = "";
-                return;
-            }
-            emit ConsoleWrite(QString("Packet received from ").append(pkt.src.toString()));
-            QIcmpTimer *timer = new QIcmpTimer(pkt.src.toString());
-            connect(timer, SIGNAL(send(QString,quint8)), this, SLOT(CreateIcmpPacket(QString,quint8)));
-        }
-        else if (pkt.data == "echo request")
-        {
-            CreateIcmpPacket(pkt.src.toString(), 0);
-        }
-    }
-}
-
-void Device::RoutePacket(packet &pkt)
-{
-    if (pkt.dst == QHostAddress::LocalHost)
-    {
-        pkt.src = QHostAddress::LocalHost;
-        pkt.src_mac = "00:00:00:00:00:00";
-        PacketRecieved(pkt, 0);
+        pkt->srcip = QHostAddress(QHostAddress::LocalHost).toIPv4Address();
+        ether_frame frm;
+        frm.src_mac = "";
+        frm.dst_mac = "";
+        frm.pkt = pkt;
+        PacketRecieved(frm, 0);
         return;
     }
     foreach (const Device::route& r, mRoutes)
     {
-        if (pkt.dst.isInSubnet(r.net,r.prefix))
+        if (QHostAddress(pkt->dstip).isInSubnet(r.net,r.prefix))
         {
-            if (type == dev_router && pkt.nhop != QHostAddress::Any && !keeped_dst.isNull())
+            if (!isTransit && pkt->srcip == 1)
             {
-                pkt.src = keeped_dst;
-                keeped_dst = QHostAddress::Null;
+                pkt->srcip = r.src.toIPv4Address();
+                isTransit = false;
             }
-            else if (pkt.nhop == QHostAddress::Any && type == dev_router)
-            {
-            }
-            else
-            {
-                pkt.src = r.src;
-            }
+
             // Choose interface and port to send packet
-            foreach (QString key, mInterfaces.keys())
+            foreach (deviceInterface iface, mInterfaces)
             {
-                if (mInterfaces[key].state == false)
+                if (iface.state == false)
                     continue;
-                if (mInterfaces[key].address.ip() == pkt.dst)
+                // Packet for itself don't need be routing, it don't have table=local
+                if (pkt->dstip == iface.address.ip().toIPv4Address())
                 {
-                    PacketRecieved(pkt, mInterfaces[key].AssignedPort->number);
+                    ether_frame frm;
+                    frm.src_mac = iface.hwaddr;
+                    frm.dst_mac = iface.hwaddr;
+                    frm.pkt = pkt;
+                    PacketRecieved(frm, iface.AssignedPort->number);
                     return;
                 }
-                else if (mInterfaces[key].address.ip() == r.src)
+                // if all OK — incasulate in ethernet frame and route it
+                else if (iface.address.ip() == r.src)
                 {
-                    pkt.nhop = r.gw;
-                    pkt.src_mac = mInterfaces[key].hwaddr;
-                    emit doSend(mInterfaces[key].AssignedPort->number, pkt);
+                    ether_frame frm;
+                    frm.src_mac = iface.hwaddr;
+                    frm.dst_mac = "";
+                    frm.pkt = pkt;
+
+                    // Arp protocol don't realize by design
+                    // Until we haven't switch, I realize this algoritm
+                    // CAUTION! It won't be work if we have switch on the end of patch-cord!!!
+                    foreach (deviceLink* lnk, links)
+                    {
+                        Device* d;
+                        devicePort* p;
+                        if (lnk->firstPort == iface.AssignedPort)
+                        {
+                            d = lnk->secondDevice;
+                            p = lnk->secondPort;
+                        }
+                        else if (lnk->secondPort == iface.AssignedPort)
+                        {
+                            d = lnk->firstDevice;
+                            p = lnk->firstPort;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                        foreach (deviceInterface riface, d->Interfaces())
+                        {
+                            if (riface.AssignedPort == p)
+                            {
+                                frm.dst_mac = riface.hwaddr;
+                            }
+                        }
+                    }
+                    // End of arp fiction!
+
+                    emit doSend(iface.AssignedPort->number, frm);
                     return;
                 }
             }
@@ -410,31 +430,21 @@ void Device::RoutePacket(packet &pkt)
     }
 }
 
-void Device::CreateIcmpPacket(const QString &dst, const quint8 &iType)
+void Device::CreateIcmpPacket(const quint32& dst, const quint8& iType, const quint32& src)
 {
-    packet pkt;
-//            pkt.sport = qrand() % (65535 - 1025) + 1025;
-    pkt.proto = packet::icmp;
-    pkt.sport = 0;
-    pkt.dport = 0;
-    pkt.dst = QHostAddress(dst);
-    switch(iType)
-    {
-        case 0:
-                pkt.data = "echo reply";
-                break;
-        case 8:
-                pkt.data = "echo request";
-                break;
-    }
-    pkt.ttl = 65;
+    icmp_packet* pkt = new icmp_packet();
+    pkt->type = "icmp";
+    pkt->dstip = dst;
+    pkt->srcip = src;
+    pkt->icmp_type = iType;
+    pkt->ttl = 65;
     RoutePacket(pkt);
 }
 
 
-QIcmpTimer::QIcmpTimer(const QString &dst):
-    mDst(dst)
+QIcmpTimer::QIcmpTimer(const quint32& dst)
 {
+    mDst = dst;
     QTimer::singleShot(1000, this, SLOT(timerShot()));
 }
 

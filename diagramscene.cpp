@@ -33,6 +33,7 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent *mouseEvent)
             item = new DiagramItem(myItemType, myItemMenu);
             addItem(item);
             connect(item, SIGNAL(itemSelected(DiagramItem*)), this, SIGNAL(itemSelected(DiagramItem*)));
+            connect(item, SIGNAL(PropertiesRequest(DiagramItem*)), this, SIGNAL(propertiesRequest(DiagramItem*)));
             item->setPos(mouseEvent->scenePos());
             emit itemInserted(item);
             break;

@@ -9,6 +9,7 @@ PC::PC(const QString &name, const unsigned int &count) : Device (name)
     SetOSType();
     CreatePorts(count);
     InitializeInterfaces(count);
+    allow_forward = false;
 }
 
 void PC::CreatePorts(const quint8 &count)
@@ -25,8 +26,8 @@ void PC::CreatePorts(const quint8 &count)
     }
     foreach (QString key, ports.keys())
     {
-        connect(this, SIGNAL(doSend(quint8,packet&)), ports[key], SLOT(doSend(quint8,packet&)));
-        connect(ports[key], SIGNAL(doRecieve(packet&,quint8)), this, SLOT(PacketRecieved(packet&,quint8)));
+        connect(this, SIGNAL(doSend(quint8,ether_frame&)), ports[key], SLOT(doSend(quint8,ether_frame&)));
+        connect(ports[key], SIGNAL(doRecieve(ether_frame&,quint8)), this, SLOT(PacketRecieved(ether_frame&,quint8)));
     }
 }
 
@@ -127,10 +128,14 @@ void PC::ping(QStringList &dst)
     if (QString(dst[0]).isEmpty())
         dst.replace(0, "--help");
     if (dst[0] == "-h" || dst[0] == "--help")
+    {
         str = "Usage: ping [-LRUbdfnqrvVaA] [-c count] [-i interval] [-w deadline]\n"
               "              [-p pattern] [-s packetsize] [-t ttl] [-I interface or address]\n"
               "              [-M mtu discovery hint] [-S sndbuf]\n"
               "              [ -T timestamp option ] [ -Q tos ] [hop1 ...] destination";
+        emit ConsoleWrite(str);
+        emit CommandReturn();
+    }
     else
     {
         //TODO: Here may be DNS request...
@@ -145,7 +150,7 @@ void PC::ping(QStringList &dst)
             str = QString("PING ").append(dst[0]).append(" (").append(
                         dst[0]).append(") %1(84) bytes of data.").arg(65 /*ttl*/);
             emit ConsoleWrite(str);
-            CreateIcmpPacket(dst[0], 8);
+            CreateIcmpPacket(QHostAddress(dst[0]).toIPv4Address(), 8);
         }
     }
 }

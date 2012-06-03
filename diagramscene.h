@@ -32,6 +32,8 @@ signals:
     void itemSelected(DiagramItem* item);
     void linkInserted(DiagramItem* firstItem, DiagramItem* secondItem, Link* link);
 
+    void propertiesRequest(DiagramItem* item);
+
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* mouseEvent);
     void mouseMoveEvent(QGraphicsSceneMouseEvent* mouseEvent);

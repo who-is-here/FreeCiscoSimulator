@@ -13,6 +13,8 @@ router::router(const QString &name, const unsigned int &count) : Device (name)
     enable_password = "secret";
 
     prompt_state.clear();
+
+    allow_forward = true;
 }
 
 void router::CreatePorts(const quint8 &count)
@@ -29,8 +31,8 @@ void router::CreatePorts(const quint8 &count)
     }
     foreach (QString key, ports.keys())
     {
-        connect(this, SIGNAL(doSend(quint8,packet&)), ports[key], SLOT(doSend(quint8,packet&)));
-        connect(ports[key], SIGNAL(doRecieve(packet&,quint8)), this, SLOT(PacketRecieved(packet&,quint8)));
+        connect(this, SIGNAL(doSend(quint8,ether_frame&)), ports[key], SLOT(doSend(quint8,ether_frame&)));
+        connect(ports[key], SIGNAL(doRecieve(ether_frame&,quint8)), this, SLOT(PacketRecieved(ether_frame&,quint8)));
     }
 }
 

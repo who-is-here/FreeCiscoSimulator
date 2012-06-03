@@ -12,6 +12,8 @@ class Console : public QPlainTextEdit
 public:
     explicit Console(QWidget* parent = 0);
     void scrollDown();
+    void cmdConnect(const QString& args);
+    Device *device() const {return dev;}
 protected:
     void keyPressEvent(QKeyEvent* event);
     void mousePressEvent(QMouseEvent*);
@@ -27,7 +29,6 @@ private:
     QString _currentCommand;
     bool _keep_currentCommand;
 
-    void cmdConnect(const QString& args);
     void cmdClear(void);
 
     void onEnter();
@@ -40,6 +41,7 @@ signals:
     void onCommand(const QString&);
     void onChange(const QString&);
     void CommandInterrupted(const QString& cmd);
+    void disconnectCommand(Console* console);
 //    void onBreak(const QString&);
 //    void Finished(const QString&);
 public slots:

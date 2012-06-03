@@ -16,6 +16,7 @@ class QLineEdit;
 class QGraphicsTextItem;
 class QAbstractButton;
 class QGraphicsView;
+class SeparateTerminal;
 
 class Console;
 
@@ -36,6 +37,7 @@ class MainWindow : public QMainWindow
         void itemInserted(DiagramItem* item);
         void linkInserted(DiagramItem* first, DiagramItem* second, Link* GLink);
         void itemSelected(DiagramItem* item);
+        void openSeparateTerminal(DiagramItem* item);
         void ShowProperties();
         void ShowProperties(DiagramItem* item);
         void sceneScaleChanged(const QString& scale);
@@ -101,6 +103,8 @@ class MainWindow : public QMainWindow
         QAction* lineAction;
 
         QAction* statusbar;
+
+        SeparateTerminal *mSeparateTerminal;
 };
 
 #endif

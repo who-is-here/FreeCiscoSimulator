@@ -1,23 +1,19 @@
 #include "deviceport.h"
 
-#include <QApplication>
-//#include "Device.h"
-
 devicePort::devicePort(QObject *parent) :
     QObject(parent)
 {
 }
 
-void devicePort::RecivePacket(packet &pkt)
+void devicePort::RecivePacket(ether_frame& frm)
 {
-    qDebug() << name;
-    emit doRecieve(pkt, number);
+    emit doRecieve(frm, number);
 }
 
-void devicePort::doSend(const quint8& num, packet& pkt)
+void devicePort::doSend(const quint8& num, ether_frame& frm)
 {
     if (num == number)
     {
-        emit SendPacket(pkt);
+        emit SendPacket(frm);
     }
 }

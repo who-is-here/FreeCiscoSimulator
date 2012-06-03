@@ -8,6 +8,7 @@
 #include "Device.h"
 #include "deviceport.h"
 #include "console.h"
+#include "separateterminal.h"
 
 // For LoadSettings function
 #include "PC.h"
@@ -15,7 +16,9 @@
 
 const int InsertTextButton = 10;
 
-MainWindow::MainWindow()
+MainWindow::MainWindow():
+    isLoaded(false),
+    mSeparateTerminal(0)
 {
     createActions();
     createToolBox();
@@ -28,6 +31,7 @@ MainWindow::MainWindow()
     connect(scene, SIGNAL(itemInserted(DiagramItem*)), this, SLOT(itemInserted(DiagramItem*)));
     connect(scene, SIGNAL(linkInserted(DiagramItem*,DiagramItem*,Link*)), this, SLOT(linkInserted(DiagramItem*,DiagramItem*,Link*)));
     connect(scene, SIGNAL(itemSelected(DiagramItem*)), this, SLOT(itemSelected(DiagramItem*)));
+    connect(scene, SIGNAL(propertiesRequest(DiagramItem*)), this, SLOT(openSeparateTerminal(DiagramItem*)));
     createToolbars();
 
     QFrame *hr = new QFrame;
@@ -53,8 +57,6 @@ MainWindow::MainWindow()
     setCentralWidget(widget);
     setWindowTitle(tr("FreeCiscoSimulator"));
     setUnifiedTitleAndToolBarOnMac(true);
-
-    isLoaded = false;
 }
 void MainWindow::buttonGroupClicked(int id)
 {
@@ -955,8 +957,8 @@ void MainWindow::LoadProject()
                     pLink->firstDevice->AddLink(pLink);
                     pLink->secondDevice->AddLink(pLink);
                     gLink->AssignLink(pLink);
-                    connect(pLink->firstPort, SIGNAL(SendPacket(packet&)),  pLink->secondPort, SLOT(RecivePacket(packet&)));
-                    connect(pLink->secondPort, SIGNAL(SendPacket(packet&)), pLink->firstPort, SLOT(RecivePacket(packet&)));
+                    connect(pLink->firstPort, SIGNAL(SendPacket(ether_frame&)),  pLink->secondPort, SLOT(RecivePacket(ether_frame&)));
+                    connect(pLink->secondPort, SIGNAL(SendPacket(ether_frame&)), pLink->firstPort, SLOT(RecivePacket(ether_frame&)));
 
                     scene->addItem(gLink);
                     gLink->updatePosition();
@@ -976,4 +978,20 @@ void MainWindow::LoadProject()
     
     ProjectFile = filename;
     isLoaded = true;
+}
+
+
+void MainWindow::openSeparateTerminal(DiagramItem *item)
+{
+    if (!mSeparateTerminal) {
+        mSeparateTerminal = new SeparateTerminal();
+    }
+
+    if (mSeparateTerminal->isHidden())
+        mSeparateTerminal->show();
+
+    mSeparateTerminal->setConsole(item->device->GetDeviceID());
+
+    mSeparateTerminal->activateWindow();
+    mSeparateTerminal->raise();
 }

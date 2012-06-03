@@ -14,7 +14,9 @@ HEADERS = mainwindow.h \
     devicecommand.h \
     routeripconfigurecommand.h \
     routeriproutecommand.h \
-    routershowcommand.h
+    routershowcommand.h \
+    packet.h \
+    separateterminal.h
 SOURCES = mainwindow.cpp \
     diagramitem.cpp \
     diagramscene.cpp \
@@ -29,6 +31,8 @@ SOURCES = mainwindow.cpp \
     devicecommand.cpp \
     routeripconfigurecommand.cpp \
     routeriproutecommand.cpp \
-    routershowcommand.cpp
+    routershowcommand.cpp \
+    packet.cpp \
+    separateterminal.cpp
 RESOURCES = FreeCiscoSimulator.qrc
 TRANSLATIONS = translation_ru.ts

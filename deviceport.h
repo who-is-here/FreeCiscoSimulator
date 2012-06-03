@@ -2,9 +2,7 @@
 #define DEVICEPORT_H
 
 #include <QObject>
-//class Device;
-//struct packet;
-#include "Device.h"
+#include "packet.h"
 
 class devicePort : public QObject
 {
@@ -15,10 +13,10 @@ public:
     quint8 number;
     bool busy;
 signals:
-    void SendPacket(packet& pkt);
-    void doRecieve (packet& pkt, const quint8& port);
+    void SendPacket(ether_frame& frm);
+    void doRecieve (ether_frame& frm, const quint8& port);
 public slots:
-    void RecivePacket(packet& pkt);
-    void doSend(const quint8& num, packet& pkt);
+    void RecivePacket(ether_frame& frm);
+    void doSend(const quint8& num, ether_frame& frm);
 };
 #endif // DEVICEPORT_H
